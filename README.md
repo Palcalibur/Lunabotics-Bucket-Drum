@@ -43,3 +43,5 @@ Still in the Python Interpreter settings menu, click the Gear Icon (or three dot
 * Browse into your cloned repository folder and select the bin/Release folder.
 
 * Click OK on all menus to apply the changes.
+
+* If Pycharm Code Insight (intellisense) does not find pychrono (only a visual bug, code will run fine): Right click on bin/Release and click Mark Directory As -> Source Root
