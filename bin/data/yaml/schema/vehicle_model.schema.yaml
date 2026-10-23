@@ -1,0 +1,111 @@
+# =============================================================================
+# PROJECT CHRONO - http://projectchrono.org
+#
+# Copyright (c) 2025 projectchrono.org
+# All rights reserved.
+#
+# Use of this source code is governed by a BSD-style license that can be found
+# in the LICENSE file at the top level of the distribution and at
+# http://projectchrono.org/license-chrono.txt.
+# =============================================================================
+#
+# Schema for a YAML Chrono::Vehicle model specification file.
+# The `chrono-version` must match the Chrono major and minor version numbers.
+#
+# =============================================================================
+
+required: [chrono-version, model]
+
+chrono-version:
+  type: string
+  description: Chrono version compatible with this YAML specification (M.m or M.m.p)
+
+# -----------------------------------------------------------------------------
+# Definitions of common Chrono types
+
+vector3d: &VECTOR3D   # Specification of a ChVector3d
+    type: array
+    items:
+        type: number
+    minItems: 3
+    maxItems: 3
+
+# -----------------------------------------------------------------------------
+# Definition of the vehicle model
+
+model:
+  description: |
+    Definition of a Chrono::Vehicle model.
+    The vehicle and its sub-systems are specified through Chrono::Vehicle JSON specification files.
+    The vehicle type (wheeled or tracked) is inferred from the "Template" field of the vehicle JSON file.
+  type: object
+  required: [vehicle_json, engine_json, transmission_json]
+  properties:
+    name:
+      type: string
+      description: Name of the model
+      default: ''
+    angle_degrees:
+      type: boolean
+      description: Whether angles are specified in degrees (true) or radians (false)
+      default: true
+    data_path:
+      type: object
+      description: Location of the JSON data files referenced in this model specification
+      required: [type]
+      properties:
+        type:
+            type: string
+            description: Mode for data file location
+            enum: [ABSOLUTE, RELATIVE]
+            default: ABSOLUTE
+        root:
+            type: string
+            description: Root of data files, relative to the location of this script
+            default: "."
+    vehicle_json:
+      description: JSON file for vehicle model specification
+      type: string
+    engine_json:
+      description: JSON file for engine model specification
+      type: string
+    transmission_json:
+      description: JSON file for transmission model specification
+      type: string
+    tire_json:
+      description: JSON file for tire model specification (required for WHEELED vehicles)
+      type: string
+
+# Note: the following four objects are specified at the top level of the vehicle model file
+#       (as siblings of the `model` object), not nested inside `model`.
+
+terrain_json:
+  description: JSON file for rigid terrain specification. If absent, no terrain is created.
+  type: string
+  default: ""
+      
+initial_position:
+  <<: *VECTOR3D
+  description: Initial vehicle position
+  default: [0, 0, 0]
+
+initial_yaw:
+  description: Initial vehicle yaw angle, always in degrees (independent of the model `angle_degrees` setting)
+  type: number
+  default: 0.0
+
+chase_camera:
+  description: Parameters for the vehicle chase camera
+  type: object
+  required: [chassis_point, chase_distance, chase_height]
+  properties:
+    chassis_point:
+      <<: *VECTOR3D
+      description: Chase camera target point on chassis
+    chase_distance:
+      description: Initial value of the horizontal distance between camera and target point
+      type: number
+    chase_height:
+      description: Initial value of the vertical distance between camera and target point
+      type: number
+    

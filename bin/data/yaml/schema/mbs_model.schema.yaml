@@ -1,0 +1,927 @@
+# =============================================================================
+# PROJECT CHRONO - http://projectchrono.org
+#
+# Copyright (c) 2025 projectchrono.org
+# All rights reserved.
+#
+# Use of this source code is governed by a BSD-style license that can be found
+# in the LICENSE file at the top level of the distribution and at
+# http://projectchrono.org/license-chrono.txt.
+# =============================================================================
+#
+# Schema for a Chrono YAML MBS model specification file.
+# The `chrono-version` must match the Chrono major and minor version numbers.
+# The `model` object contains the schema for the model YAML specification.
+#
+# Notes:
+# - Chrono is unit-independent.
+#   While any consistent set of units is acceptable, most models are specified
+#   in SI units. For convenience, the Chrono YAML specification allows definition
+#   of angles in radians or degrees.
+#
+# =============================================================================
+
+required: [chrono-version, model]
+
+chrono-version:
+  type: string
+  description: Chrono version compatible with this YAML specification (M.m or M.m.p)
+
+# -----------------------------------------------------------------------------
+# Definitions of common Chrono types
+# -----------------------------------------------------------------------------
+
+# Specification of a ChVector3d
+vector3d: &VECTOR3D
+    type: array
+    items:
+        type: number
+    minItems: 3
+    maxItems: 3
+
+# Specification of a 3D rotation
+# A rotation can be provided as:
+# - an Euler angle sequence [yaw, pitch, roll], with angles assumed in radians or degrees, or
+# - a unit quaternion [e0, e1, e2, e3]
+orientation3d: &ORIENTATION3D
+    type: array
+    description: Frame orientation as Euler angles or as quaternion
+    items:
+      type: number
+    minItems: 3
+    maxItems: 4
+
+# Specification of a color
+color: &COLOR
+  type: array
+  description: RGB color [r, g, b]
+  items:
+    type: number
+    minimum: 0
+    maximum: 1
+  minItems: 3
+  maxItems: 3
+
+# Specification of an inertia matrix
+inertia33: &INERTIA33
+    type: object
+    description: Inertia moments and products
+    properties:
+      moments:
+        type: array
+        description: Moments of inertia [Ixx, Iyy, Izz]
+        items:
+          type: number
+          minimum: 0
+        minItems: 3
+        maxItems: 3
+      products:
+        type: array
+        description: Products of inertia [Ixy, Ixz, Iyz]
+        items:
+          type: number
+          default: 0
+        minItems: 3
+        maxItems: 3
+
+# Specification of a data array with 2 columns
+data_array_2: &DATA_ARRAY_2
+    type: array
+    description: Array of number pairs
+    items:
+      type: array
+      items:
+        type: number
+      minItems: 2
+      maxItems: 2
+
+# Specification of a data array with 3 columns
+data_array_3: &DATA_ARRAY_3
+    type: array
+    description: Array of number 3-tuples
+    items:
+      type: array
+      items:
+        type: number
+      minItems: 3
+      maxItems: 3
+
+# Specification of a data array with N columns
+data_array_N: &DATA_ARRAY_N
+    type: array
+    description: Array of N-tuples
+    items:
+      type: array
+      items:
+        type: number
+      minItems: 1
+
+# Specification of a function of one variable
+function: &FUNCTION
+    type: object
+    description: Function of one variable
+    required: [type]
+    properties:
+      type:
+        type: string
+        enum: [CONSTANT, POLYNOMIAL, SINE, RAMP, DATA, CONTROLLER]
+        description: Function type
+      repeat:
+        type: object
+        description: Periodic replication of the underlying function
+        start:
+          type: number
+          description: Slice start position
+        width:
+          type: number
+          description: Slice width
+        shift:
+          type: number
+          description: Slice shift
+      value:
+        type: number
+        description: Constant value for CONSTANT type
+      coefficients:
+        type: array
+        description: Coefficents for POLYNOMIAL type
+        items:
+          type: number
+        minItems: 2
+      amplitude:
+        type: number
+        description: Amplitude for SINE type
+      frequency:
+        type: number
+        description: Frequency for SINE type
+      phase:
+        type: number
+        description: Phase for SINE type
+        default: 0.0
+      slope:
+        type: number
+        description: Slope for RAMP type
+      intercept:
+        type: number
+        description: Intercept value for RAMP type
+        default: 0.0
+      data:
+        <<: *DATA_ARRAY_2
+        description: Interpolation data points for DATA type [[x, f(x)], ...]  
+
+# Specification of a reference to a node of an FEA mesh
+fea_node: &FEA_NODE
+    type: object
+    description: Reference to a node of an FEA mesh
+    required: [mesh, index]
+    properties:
+      mesh:
+        type: string
+        description: Name of the FEA mesh (e.g. the name of a beam)
+      index:
+        type: integer
+        description: 1-based index of the node within that mesh
+
+# Specification of visualization settings for an FEA mesh
+fea_visualization: &FEA_VISUALIZATION
+    type: object
+    description: Visualization settings for an FEA mesh
+    properties:
+      data:
+        type: object
+        description: Colormap-based rendering of a nodal or elemental quantity
+        required: [type]
+        properties:
+          type:
+            type: string
+            description: Quantity used for coloring
+            enum: [NONE, SURFACE,
+                   NODE_DISP_NORM, NODE_SPEED_NORM, NODE_ACCEL_NORM, NODE_FIELD_VALUE,
+                   ELEM_STRAIN_VONMISES, ELEM_STRESS_VONMISES,
+                   ELEM_BEAM_MX, ELEM_BEAM_MY, ELEM_BEAM_MZ,
+                   ELEM_BEAM_TX, ELEM_BEAM_TY, ELEM_BEAM_TZ,
+                   ANCF_BEAM_AX, ANCF_BEAM_BD]
+            default: NONE
+          range:
+            type: array
+            description: Color data range [min, max]
+            items:
+              type: number
+            minItems: 2
+            maxItems: 2
+            default: [0, 1]
+          colormap:
+            type: string
+            description: Colormap
+            enum: [BLACK_BODY, BLUE, BROWN, COPPER, FAST, INFERNO, JET, KINDLMANN, PLASMA, RED_BLUE]
+            default: FAST
+          smooth_faces:
+            type: boolean
+            description: Whether to render with smooth (averaged) normals
+            default: true
+          wireframe:
+            type: boolean
+            description: Whether to render the mesh in wireframe mode
+            default: false
+      glyphs:
+        type: object
+        description: Glyph rendering of nodal or elemental quantities
+        required: [type]
+        properties:
+          type:
+            type: string
+            description: Glyph type
+            enum: [NONE, NODE_DOT_POS, NODE_CSYS, NODE_VECT_SPEED, NODE_VECT_ACCEL,
+                   ELEM_TENS_STRAIN, ELEM_TENS_STRESS, ELEM_VECT_DP]
+            default: NONE
+          size:
+            type: number
+            description: Glyph size
+            default: 0.002
+          color:
+            <<: *COLOR
+            description: Glyph color
+            default: [1, 1, 1]
+
+# Specification of geometric shapes for visualization and collision
+shape : &SHAPE
+    type: object
+    properties:
+        type:
+            type: string
+            description: Geometric shape type
+            enum: [SPHERE, BOX, CYLINDER, HULL, MESH]
+        location:
+            <<: *VECTOR3D
+            description: Shape location relative to body reference frame
+        orientation:
+            <<: *ORIENTATION3D
+            description: Shape orientation relative to body reference frame
+        dimensions:
+            <<: *VECTOR3D
+            description: Length, width, and height (required for BOX type)
+        radius:
+            type: number
+            description: Radius of the sphere (required for SPHERE or CYLINDER type)
+            minimum: 0.0
+        length:
+            type: number
+            description: Length (required for CYLINDER type)
+            minimum: 0.0
+        axis:
+            <<: *VECTOR3D
+            description: Axis direction expressed in body reference frame (required for CYLINDER type)
+        filename:
+            type: string
+            description: 3D data file name (required for MESH or HULL type)
+        scale:
+            type: number
+            description: Scale factor (for MESH type)
+            default: 1.0
+
+visualization_shape: &VISUALIZATION_SHAPE
+    type: object
+    description: Visualization shape
+    required: [type]
+    properties:
+      <<: *SHAPE
+      color:
+        <<: *COLOR
+        description: Diffuse color for this shape
+        default: [0.75, 0.75, 0.75]
+
+colision_shape: &COLLISION_SHAPE
+    type: object
+    description: Collision shape
+    required: [type, material]
+    properties:
+      <<: *SHAPE
+      material:
+        type: string
+        description: Name of the material used for this collision shape
+      contact_radius:
+        type: number
+        description: Contact radius for MESH shape
+        default: 0.0
+        minimum: 0.0
+
+# Specification of contact material properties
+contact_material: &CONTACT_MATERIAL
+  type: object
+  required: [name]
+  properties:
+    name:
+      type: string
+      description: Unique identifier for the material
+    coefficient_of_friction:
+      type: number
+      description: Friction coefficient
+      default: 0.8
+    coefficient_of_restitution:
+      type: number
+      description: Coefficient of restitution
+      default: 0.01
+    physical_properties: 
+      type: object
+      description: physical material properties for SMC contact
+      required: [Young_modulus, Poisson_ratio]
+      properties:
+        Young_modulus:
+          type: number
+          description: Young's modulus of the material
+        Poisson_ratio:
+          type: number
+          description: Poisson's ratio of the material
+    coefficients:
+      type: object
+      description: normal and tangential stiffness and damping coefficients for SMC contact
+      required: [normal_stiffness, normal_damping, tangential_stiffness, tangential_damping]
+      properties:
+        normal_stiffness:
+          type: number
+          description: Normal stiffness coefficient
+        normal_damping:
+          type: number
+          description: Normal damping coefficient
+        tangential_stiffness:
+          type: number
+          description: Tangential stiffness coefficient
+        tangential_damping:
+          type: number
+          description: Tangential damping coefficient
+
+body_load: &BODY_LOAD
+  type: object
+  required: [name, type, body, load]
+  properties:
+    name:
+      type: string
+      description: Unique identifier for the body load
+    type:
+      type: string
+      enum: [FORCE, TORQUE]
+      description: Type of body load
+    body:
+      type: string
+      description: Name of the body to which the load is applied
+    load:
+      <<: *VECTOR3D
+      description: Load vector for force or torque
+    local_load:
+      type: boolean
+      description: Whether load is applied in local body frame (true) or global frame (false)
+      default: true
+    point:
+      <<: *VECTOR3D
+      description: (FORCE only) Location of the applied load
+      default: [0, 0, 0]
+    local_point:
+      type: boolean
+      description: (FORCE only) Whether point is specified in local body frame (true) or global frame (false)
+      default: true
+
+# -----------------------------------------------------------------------------
+# Definition of a Chrono multibody model
+# -----------------------------------------------------------------------------
+
+model:
+  type: object
+  description: Definition of a Chrono multibody model
+  required: [bodies]
+
+  properties:
+
+    name:
+      type: string
+      description: Name of the model
+      default: ''
+
+    angle_degrees:
+      type: boolean
+      description: Whether angles are specified in degrees (true) or radians (false)
+      default: true
+    
+    data_path:
+      type: object
+      description: Location of data files in the model specification
+      required: [type]
+      properties:
+        type: 
+            type: string
+            description: Mode for data file location
+            enum: [ABSOLUTE, RELATIVE]
+            default: ABSOLUTE
+        root:
+            type: string
+            description: Root of data files, relatiuve to location of this script
+            default: "."
+
+    bodies:
+      type: array
+      description: List of bodies in the system
+      items:
+        type: object
+        required: [name, location]
+        properties:
+          name:
+            type: string
+            description: Unique identifier for the body
+          fixed:
+            type: boolean
+            description: Whether the body is fixed to ground
+            default: false
+          location:
+            <<: *VECTOR3D
+            description: Initial body reference frame origin relative to global frame
+          orientation:
+            <<: *ORIENTATION3D
+            description: Initial body reference frame orientation relative to global frame
+            default: [0, 0, 0]
+          initial_linear_velocity:
+            <<: *VECTOR3D
+            description: Initial linear velocity of the body reference frame, in the global frame
+            default: [0, 0, 0]
+          initial_angular_velocity:
+            <<: *VECTOR3D
+            description: Initial angular velocity of the body, expressed in the body reference frame
+            default: [0, 0, 0]
+          mass:
+            type: number
+            description: Mass of the body
+            minimum: 0
+          com:
+            type: object
+            description: Center of mass (COM) frame
+            properties:
+              location:
+                <<: *VECTOR3D
+                description: COM frame origin relative to body reference frame
+                default: [0, 0, 0]
+              orientation:
+                <<: *ORIENTATION3D
+                description: COM frame orientation relative to body reference frame
+                default: [1, 0, 0, 0]
+          inertia:
+            <<: *INERTIA33
+            description: Body inertia properties
+          contact:
+            type: object
+            description: Contact material and collision geometry
+            required: [materials, shapes]
+            properties:
+              materials:
+                type: array
+                description: List of contact material properties
+                items: 
+                  <<: *CONTACT_MATERIAL
+              shapes:
+                type: array
+                description: List of collision shapes
+                items:
+                  <<: *COLLISION_SHAPE
+          visualization:
+            type: object
+            description: Visualization geometry
+            properties:
+              model_file:
+                type: string
+                description: Path to a model file for visualization
+              shapes:
+                type: array
+                description: List of visualization shapes
+                items:
+                   <<: *VISUALIZATION_SHAPE
+
+    joints:
+      type: array
+      description: List of joints connecting bodies
+      items:
+        type: object
+        required: [name, type, body1, body2, location]
+        properties:
+          name:
+            type: string
+            description: Unique identifier for the joint
+          type:
+            type: string
+            description: Type of joint
+            enum: [LOCK, REVOLUTE, SPHERICAL, PRISMATIC, CYLINDRICAL, UNIVERSAL, POINT_LINE, POINT_PLANE ]
+          body1:
+            type: string
+            description: Name of the first body to connect
+          body2:
+            type: string
+            description: Name of the second body to connect
+          location:
+            type: array
+            description: Joint location
+            items:
+              type: number
+            minItems: 3
+            maxItems: 3
+          axis:
+            <<: *VECTOR3D
+            description: Axis of motion for revolute/prismatic joints
+          axis1:
+            <<: *VECTOR3D
+            description: First axis for universal joint
+          axis2:
+            <<: *VECTOR3D
+            description: Second axis for universal joint
+          bushing_data:
+            type: object
+            description: Bushing properties
+            properties:
+              stiffness_linear:
+                type: number
+                description: Linear stiffness coefficient for "constrained" translational DOFs
+              damping_linear:
+                type: number
+                description: Linear damping coefficient for "constrained" translational DOFs
+              stiffness_rotational:
+                type: number
+                description: Rotational stiffness coefficient for "constrained" rotational DOFs
+              damping_rotational:
+                type: number
+                description: Rotational damping coefficient for "constrained" rotational DOFs
+              DOF:
+                type: object
+                description: Degree of freedom specific properties
+                properties:
+                  stiffness_linear:
+                    type: number
+                    description: Linear stiffness coefficient for "unconstrained" translational DOF
+                  damping_linear:
+                    type: number
+                    description: Linear damping coefficient for "unconstrained" translational DOF
+                  stiffness_rotational:
+                    type: number
+                    description: Rotational stiffness coefficient for "unconstrained" rotational DOF
+                  damping_rotational:
+                    type: number
+                    description: Rotational damping coefficient for "unconstrained" rotational DOF
+
+    constraints:
+      type: array
+      description: List of constraints in the system
+      items:
+        type: object
+        required: [name, type, body1, body2]
+        properties:
+          name:
+            type: string
+            description: Unique identifier for the constraint
+          type:
+            type: string
+            enum: [DISTANCE, REVOLUTE-SPHERICAL, REVOLUTE-TRANSLATIONAL]
+            description: Type of constraint
+          body1:
+            type: string
+            description: Name of the first body to connect
+          body2:
+            type: string
+            description: Name of the second body to connect
+          point1:
+            <<: *VECTOR3D
+            description: Point on body1 expressed in global frame
+          point2:
+            <<: *VECTOR3D
+            description: Point on body2 expressed in global frame
+
+    tsdas:
+      type: array
+      description: List of translational spring-damper (TSDA) elements
+      items:
+        type: object
+        required: [name, body1, body2, point1, point2]
+        properties:
+          name:
+            type: string
+            description: Unique identifier for the element
+          body1:
+            type: string
+            description: Name of the first body to connect
+          body2:
+            type: string
+            description: Name of the second body to connect
+          point1:
+            <<: *VECTOR3D
+            description: Point on body1 expressed in global frame
+          point2:
+            <<: *VECTOR3D
+            description: Point on body2 expressed in global frame
+          free_length:
+            type: number
+            description: TSDA free length
+          spring_coefficient:
+            type: number
+            description: Linear spring coefficient
+          damping_coefficient:
+            type: number
+            description: Linear damping coefficient
+          spring_curve_data:
+            <<: *DATA_ARRAY_2
+            description: Nonlinear spring curve data [[displacement, force], ...]
+          damping_curve_data:
+            <<: *DATA_ARRAY_2
+            description: Nonlinear damping curve data [[velocity, force], ...]
+          degressivity_compression:
+            type: number
+            description: |
+              Degressivity coefficient in compression.
+              A degressive damper is created if this and degressivity_expansion are both present
+              together with damping_coefficient (and no spring_coefficient).
+          degressivity_expansion:
+            type: number
+            description: Degressivity coefficient in expansion (see degressivity_compression)
+          deformation:
+            type: array
+            description: TSDA deformation values for full non-linear map TSDA (required if map_data present)
+            items:
+              type: number
+            minItems: 1
+          map_data:
+            <<: *DATA_ARRAY_N
+            description: TSDA full non-linear map [[velocity, forces[]], ...]
+          preload:
+            type: number
+            description: Preload force
+          minimum_length:
+            type: number
+            description: Minimum TSDA length
+          maximum_length:
+            type: number
+            description: Maximum TSDA length
+          visualization:
+            type: object
+            description: Visualization settings for the element
+            required: [type]
+            properties:
+              type:
+                type: string
+                enum: [SEGMENT, SPRING]
+                description: Type of visualization
+              radius:
+                type: number
+                description: Radius of the visualization element (SPRING type)
+                default: 0.05
+              resolution:
+                type: integer
+                description: Number of segments used to render one coil (SPRING type)
+                default: 65
+              turns:
+                type: number
+                description: Number of coils (SPRING type)
+                default: 5
+              color:
+                <<: *COLOR
+
+    rsdas:
+      type: array
+      description: List of rotational spring-damper (RSDA) elements
+      items:
+        type: object
+        required: [name, body1, body2, axis]
+        properties:
+          name:
+            type: string
+            description: Unique identifier for the element
+          body1:
+            type: string
+            description: Name of the first body to connect
+          body2:
+            type: string
+            description: Name of the second body to connect
+          location:
+            <<: *VECTOR3D
+            description: RSDA location expressed in global frame
+          axis:
+            <<: *VECTOR3D
+            description: RSDA axis expressed in global frame
+          free_angle:
+            type: number
+            description: RSDA free angle
+          spring_coefficient:
+            type: number
+            description: Linear spring coefficient
+          damping_coefficient:
+            type: number
+            description: Linear damping coefficient
+          spring_curve_data:
+            <<: *DATA_ARRAY_2
+            description: Nonlinear spring curve data [[angle, torque], ...]
+          damping_curve_data:
+            <<: *DATA_ARRAY_2
+            description: Nonlinear damping curve data [[angular velocity, torque], ...]
+          preload:
+            type: number
+            description: Preload torque
+
+    motors:
+      type: array
+      description: List of motors in the system
+      items:
+        type: object
+        required: [name, type, body1, body2, location, axis, actuation_type, actuation_function]
+        properties:
+          name:
+            type: string
+            description: Unique identifier for the motor
+          type:
+            type: string
+            enum: [LINEAR, ROTATION]
+            description: Type of motor
+          body1:
+            type: string
+            description: Name of the first body to connect
+          body2:
+            type: string
+            description: Name of the second body to connect
+          location:
+            <<: *VECTOR3D
+            description: Motor location expressed in global frame
+          axis:
+            <<: *VECTOR3D
+            description: Motor axis expressed in global frame
+          actuation_type:
+            type: string
+            enum: [POSITION, SPEED, FORCE]
+            description: Type of actuation
+          actuation_function:
+            <<: *FUNCTION
+            description: Function of time defining actuation
+          guide:
+            type: string
+            enum: [FREE, PRISMATIC, SPHERICAL]
+            description: Guide constraint for linear motor
+          spindle:
+            type: string
+            enum: [FREE, REVOLUTE, CYLINDRICAL]
+            description: Spindle constraint for rotation motor
+
+    body_loads:
+      type: array
+      description: List of body applied loads
+      items:
+        <<: *BODY_LOAD
+        modulation_function:
+          <<: *FUNCTION
+          description: Optional function of time which modulates applied load
+          default: 1.0
+
+    load_controllers:
+      type: array
+      description: List of body loads applied by external controllers
+      items:
+        <<: *BODY_LOAD
+
+    FEA:
+      description: |
+        Finite element components of the model (requires the Chrono::FEA module).
+        If the Chrono::FEA module is not enabled, this object is ignored with a warning.
+      type: object
+      properties:
+
+        beam_sections:
+          description: |
+            List of beam section definitions, referenced by name from `beams`.
+            Only the ANCF_CABLE section type is currently implemented.
+          type: array
+          items:
+            type: object
+            required: [name, type]
+            properties:
+              name:
+                type: string
+                description: Unique identifier for the section
+              type:
+                type: string
+                description: Beam section type
+                enum: [EULER_SIMPLE, ANCF_CABLE, COSSERAT, TIMOSHENKO]
+              diameter:
+                type: number
+                description: Section diameter (ANCF_CABLE type)
+                minimum: 0
+              Young_modulus:
+                type: number
+                description: Young's modulus (ANCF_CABLE type)
+                minimum: 0
+              density:
+                type: number
+                description: Material density (ANCF_CABLE type)
+                minimum: 0
+              Rayleight_damping:
+                type: number
+                description: Rayleigh damping factor (ANCF_CABLE type). Note the spelling of this key.
+                minimum: 0
+
+        materials:
+          description: |
+            List of FEA material definitions, referenced by name from `beams` and `shells`.
+            None of the material types is currently implemented.
+          type: array
+          items:
+            type: object
+            required: [name, type]
+            properties:
+              name:
+                type: string
+                description: Unique identifier for the material
+              type:
+                type: string
+                description: FEA material type
+                enum: [BEAM_ANCF, HEXA_ANCF, SHELL_ANCF, SHELL_KIRCHHOFF, SHELL_REISSNER]
+
+        beams:
+          description: |
+            List of FEA beams. Each beam is a straight run of `num_elements` elements from
+            `start_point` to `end_point`, and constitutes one mesh (referenced by name from
+            FEA constraints). Only the ANCF_CABLE beam type is currently implemented.
+          type: array
+          items:
+            type: object
+            required: [name, type, num_elements, start_point, end_point]
+            properties:
+              name:
+                type: string
+                description: Unique identifier for the beam (used as the mesh name in FEA constraints)
+              type:
+                type: string
+                description: Beam element type
+                enum: [EULER, ANCF_CABLE, ANCF_3243, ANCF_3333, IGA, TIMOSHENKO]
+              num_elements:
+                type: integer
+                description: Number of elements along the beam
+                minimum: 1
+              start_point:
+                <<: *VECTOR3D
+                description: Location of the first beam node
+              end_point:
+                <<: *VECTOR3D
+                description: Location of the last beam node
+              section:
+                type: string
+                description: |
+                  Name of a beam section defined in `beam_sections`.
+                  Required for the EULER, ANCF_CABLE, IGA, and TIMOSHENKO types.
+              material:
+                type: string
+                description: |
+                  Name of an FEA material defined in `materials`.
+                  Required for the ANCF_3243 and ANCF_3333 types.
+              up:
+                <<: *VECTOR3D
+                description: Section "up" direction (required for the EULER type)
+              visualization:
+                <<: *FEA_VISUALIZATION
+                description: Visualization settings for this beam mesh
+
+        shells:
+          description: |
+            List of FEA shells.
+            Shell elements are not currently implemented.
+          type: array
+          items:
+            type: object
+            required: [name, type]
+            properties:
+              name:
+                type: string
+                description: Unique identifier for the shell mesh
+              type:
+                type: string
+                description: Shell element type
+
+        constraints:
+          description: List of constraints between FEA nodes and rigid bodies, or between FEA nodes
+          type: array
+          items:
+            type: object
+            required: [name, type]
+            properties:
+              name:
+                type: string
+                description: Unique identifier for the constraint
+              type:
+                type: string
+                description: |
+                  Constraint type. NODE_FRAME connects a node to a body, NODESLOPE_FRAME
+                  additionally constrains the node slope (gradient) direction, and NODE_NODE
+                  connects two FEA nodes. NODE_FACE is not currently implemented.
+                enum: [NODE_FRAME, NODESLOPE_FRAME, NODE_NODE, NODE_FACE]
+              node:
+                <<: *FEA_NODE
+                description: Constrained node (NODE_FRAME and NODESLOPE_FRAME types)
+              node1:
+                <<: *FEA_NODE
+                description: First constrained node (NODE_NODE type)
+              node2:
+                <<: *FEA_NODE
+                description: Second constrained node (NODE_NODE type)
+              body:
+                type: string
+                description: Name of the connected body (NODE_FRAME and NODESLOPE_FRAME types)
+              body_direction:
+                <<: *VECTOR3D
+                description: |
+                  Direction on the body to which the node slope is constrained, expressed in the
+                  body frame (required for the NODESLOPE_FRAME type).

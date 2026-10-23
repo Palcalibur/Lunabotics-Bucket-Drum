@@ -1,0 +1,198 @@
+# =============================================================================
+# PROJECT CHRONO - http://projectchrono.org
+#
+# Copyright (c) 2025 projectchrono.org
+# All rights reserved.
+#
+# Use of this source code is governed by a BSD-style license that can be found
+# in the LICENSE file at the top level of the distribution and at
+# http://projectchrono.org/license-chrono.txt.
+# =============================================================================
+#
+# Schema for a Chrono::FSI-SPH YAML fluid simulation specification file.
+# The `chrono-version` must match the Chrono major and minor version numbers.
+#
+# =============================================================================
+
+required: [chrono-version, type, model, solver]
+
+chrono-version:
+  type: string
+  description: Chrono version compatible with this YAML specification (M.m or M.m.p)
+
+# -----------------------------------------------------------------------------
+# Definitions of common Chrono types
+
+vector3d: &VECTOR3D   # Specification of a ChVector3d
+    type: array
+    items:
+        type: number
+    minItems: 3
+    maxItems: 3
+
+# -----------------------------------------------------------------------------
+# Definition of a Chrono::FSI-SPH simulation
+
+type:
+  description: Type of Chrono simulation (must be SPH)
+  type: string
+  value: SPH
+
+model:
+  description: |
+      Model specification YAML file.
+      The path to the model file must be provided relative to the location of this simulation specification file.
+      The model file must follow the fsisph_model.schema.
+  type: string
+
+solver:
+  description: |
+      Solver specification YAML file
+      The path to the solver file must be provided relative to the location of this simulation specification file.
+      The solver file must follow the fsisph_solver.schema.
+  type: string
+
+simulation:
+  description: Simulation settings
+  type: object
+  properties:    
+    end_time:
+      type: number
+      description: |
+        Total simulation duration in seconds.
+        The simulation will run from t=0 to t=end_time. A negative value indicates an infinite end time.
+      default: -1
+    gravity:
+      type: array
+      <<: *VECTOR3D
+      description: Gravitational acceleration vector [x, y, z]
+      default: [0, 0, -9.8]
+
+output:
+  description: Output settings
+  type: object
+  required: [format]
+  properties:
+     format:
+        type: string
+        description: Output DB format
+        enum: [NONE, ASCII, HDF5]
+        default: NONE
+     mode:
+        type: string
+        description: Output mode (one file per output frame, or a single time-series file)
+        enum: [FRAMES, SERIES]
+        default: FRAMES
+     fps:
+        type: number
+        description: Output frequency (FPS or Hz)
+        minimum: 0
+        default: 100
+
+visualization:
+  description: SPH-specific run-time visualization settings
+  type: object
+  properties:
+    sph_markers:
+      type: boolean
+      description: Render SPH particles
+      default: true
+    bndry_bce_markers:
+      type: boolean
+      description: Render boundary BCE markers
+      default: true
+    rigid_bce_markers:
+      type: boolean
+      description: Render BCE markers on rigid solids
+      default: true
+    flex_bce_markers:
+      type: boolean
+      description: Render BCE markers on flexible solids
+      default: true
+    active_boxes:
+      type: boolean
+      description: Render the active domain boxes associated with FSI solids
+      default: false
+
+    color_map:
+      description: Colormap-based coloring of SPH particles
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          description: Particle quantity used for coloring
+          enum: [NONE, HEIGHT, VELOCITY, DENSITY, PRESSURE]
+          default: NONE
+        map:
+          type: string
+          description: Colormap
+          enum: [BLACK_BODY, BLUE, BROWN, COPPER, FAST, INFERNO, JET, KINDLMANN, PLASMA, RED_BLUE]
+          default: JET
+        min:
+          type: number
+          description: Lower end of the color data range (required unless type is NONE)
+        max:
+          type: number
+          description: Upper end of the color data range (required unless type is NONE)
+        up:
+          <<: *VECTOR3D
+          description: Direction along which height is measured (HEIGHT type only)
+          default: [0, 0, 1]
+        bimodal:
+          type: boolean
+          description: Use a bimodal (two-sided) color scale (required for PRESSURE type)
+
+    visibility:
+      description: |
+        Marker visibility control through a set of half-spaces.
+        A marker is hidden depending on its position relative to the specified planes.
+      type: object
+      required: [planes]
+      properties:
+        planes:
+          description: List of planes defining the half-spaces
+          type: array
+          items:
+            type: object
+            required: [point, normal]
+            properties:
+              point:
+                <<: *VECTOR3D
+                description: A point on the plane
+              normal:
+                <<: *VECTOR3D
+                description: Plane normal direction
+        mode:
+          type: string
+          description: Whether a marker must be inside all half-spaces or any one of them
+          enum: [ALL, ANY]
+          default: ALL
+        SPH:
+          type: boolean
+          description: Apply the visibility criterion to SPH particles
+          default: true
+        BCE:
+          type: boolean
+          description: Apply the visibility criterion to BCE markers
+          default: true
+
+    splashsurf:
+      description: |
+        Fluid surface reconstruction (splashsurf).
+        The mere presence of this object enables surface reconstruction.
+      type: object
+      properties:
+        smoothing_length:
+          type: number
+          description: Smoothing length for the SPH kernel, in multiples of the particle radius
+          default: 1.5
+        cube_size:
+          type: number
+          description: Marching-cubes edge length, in multiples of the particle radius
+          default: 0.5
+        surface_threshold:
+          type: number
+          description: Iso-surface density threshold, in multiples of the rest density
+          default: 0.6
+

@@ -9,7 +9,7 @@ batch_settings:
 # Definition pool of physical PLA bucket drums
 drums:
   - id: "open_section_drum"
-    obj_path: "assets/bucekt drums/open_section_drum.obj"
+    obj_path: "assets/bucket drums/open_section_drum.obj"
     drum_length: 0.20
     outer_radius: 0.18
     scoop_opening: 0.02
