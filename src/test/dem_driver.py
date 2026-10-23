@@ -23,7 +23,7 @@ import pychrono.irrlicht as chronoirr
 # =============================================================================
 # User parameters
 # =============================================================================
-MESH_FILE = "RASSOR_SPIKEY.obj"
+MESH_FILE = "../simulation/RASSOR_SPIKEY.obj"
 MESH_SCALE = 1.0          # set to 0.001 if the OBJ is in millimetres
 MESH_AXIS = "y"           # drum's axis of revolution *in the OBJ* ('x', 'y' or 'z')
 DRUM_MASS = 200.0         # kg; large so contact forces barely perturb the prescribed motion

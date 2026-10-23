@@ -1,0 +1,65 @@
+# ============================================================================
+# Sequential Multi-Drum Run Queue Configuration
+# ============================================================================
+
+batch_settings:
+  output_root: "./output"
+  save_particle_clouds: true
+
+# Definition pool of physical PLA bucket drums
+drums:
+  - id: "open_section_drum"
+    obj_path: "assets/bucekt drums/open_section_drum.obj"
+    drum_length: 0.20
+    outer_radius: 0.18
+    scoop_opening: 0.02
+    inner_cavity_radius: 0.16
+
+  - id: ""
+    obj_path: "assets/bucekt drums/"
+    drum_length: 0.35
+    outer_radius: 0.18
+    scoop_opening: 0.035
+    inner_cavity_radius: 0.145
+
+  - id: ""
+    obj_path: "assets/drums/"
+    drum_length: 0.50
+    outer_radius: 0.18
+    scoop_opening: 0.05
+    inner_cavity_radius: 0.13
+
+# The explicit order queue: Runs are executed from top to bottom
+run_queue:
+  - run_id: "test_run_01_open_section_drum"
+    drum_id: "open_section_drum"
+    path:
+      start_x: -0.15                   # Where digging begins [m]
+      y_offset: 0.0                    # Center track
+      cut_depth: 0.03                  # Penetration depth [m] (3 cm)
+    kinematics:
+      rpm: 20.0
+      forward_velocity: 0.04           # v_x [m/s]
+      plunge_duration: 0.50            # Time to plunge to cut_depth [s]
+#
+#  - run_id: "test_run_02_med_drum_deep"
+#    drum_id: "drum_med_35mm_open"
+#    path:
+#      start_x: -0.20
+#      y_offset: 0.0
+#      cut_depth: 0.05                  # Deep penetration depth [m] (5 cm)
+#    kinematics:
+#      rpm: 30.0
+#      forward_velocity: 0.05
+#      plunge_duration: 0.50
+#
+#  - run_id: "test_run_03_long_drum_offset"
+#    drum_id: "drum_long_5cm_open"
+#    path:
+#      start_x: -0.15
+#      y_offset: 0.05                   # Slightly offset track for structural clearance
+#      cut_depth: 0.04
+#    kinematics:
+#      rpm: 25.0
+#      forward_velocity: 0.04
+#      plunge_duration: 0.50

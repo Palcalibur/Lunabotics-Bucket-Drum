@@ -37,7 +37,7 @@ import time
 faulthandler.enable()
 
 try:
-    import chrono_setup  # noqa: F401  (optional personal env helper)
+    from test import chrono_setup
 except ImportError:
     pass
 

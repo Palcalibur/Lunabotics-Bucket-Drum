@@ -1,0 +1,46 @@
+# ============================================================================
+# BP-1 Lunar Regolith Simulant & Pit Configuration (Sized for Single Runs)
+# ============================================================================
+
+environment:
+  gravity: [0.0, 0.0, -9.81]           # Earth 1g gravity [m/s^2]
+
+soil_material:
+  name: "BP-1 Lunar Regolith Simulant"
+  rheology_model: "MU_OF_I"
+  bulk_density: 1650.0                 # Bulk density [kg/m^3]
+  young_modulus: 1.0e+7                # Elastic modulus [Pa]
+  poisson_ratio: 0.30                  # Poisson's ratio [-]
+  cohesion: 1200.0                     # Cohesion c [Pa] (1.2 kPa)
+  friction_angle_deg: 42.0             # Internal friction angle [deg]
+  mu_s: 0.9004                         # Static friction coeff [-]
+  mu_2: 1.1500                         # Dynamic friction coeff [-]
+  I_0: 0.04
+  average_grain_diameter: 0.02 #0.0002
+
+sph_discretization:
+  initial_spacing: 0.0035              # SPH spacing d_0 [m]
+  kernel_multiplier: 1.2
+  num_bce_layers: 3
+  artificial_viscosity: 0.2
+  xsph_coefficient: 0.1
+  shifting_method: "PPST_XSPH"
+
+soil_bed:
+  # Compacted pit dimensions for a single running drum
+  dimensions: [1.60, 0.85, 0.25]       # [Length (X), Width (Y), Depth (Z)] in meters
+  center: [0.35, 0.0, -0.125]          # Pit center [m]
+  active_domain_aabb: [0.65, 0.75, 0.55] # Active domain focusing SPH tracking near drum
+
+drum_structural:
+  material_density: 1240.0             # Solid PLA Density [kg/m^3]
+  mesh_swept_sphere_radius: 0.0015
+  contact_young_modulus: 3.5e+9        # PLA Young's Modulus [Pa] (3.5 GPa)
+  contact_friction: 0.55               # Higher friction coefficient for 3D-printed PLA layers
+
+simulation:
+  dt_cfd: 0.00005
+  dt_mbd: 0.00005
+  duration: 2 #6.5
+  settling_time: 0.25
+  output_fps: 60
