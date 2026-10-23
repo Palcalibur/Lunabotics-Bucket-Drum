@@ -6,6 +6,10 @@ __pycache__/
 # C extensions
 *.so
 
+# Re-enable all _*.pyd compiled modules anywhere in the repo
+!_* .pyd
+!**/_*.pyd
+
 # Distribution / packaging
 .Python
 build/
