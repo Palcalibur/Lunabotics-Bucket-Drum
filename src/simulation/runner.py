@@ -6,7 +6,6 @@ import argparse
 # ---------------------------------------------------------------------------
 # PyCharm Direct Execution Fix:
 # Automatically add project root to sys.path and set working directory to root
-# so "configs/..." and "assets/..." paths always resolve properly.
 # ---------------------------------------------------------------------------
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(str(__file__)), ".."))
 if PROJECT_ROOT not in sys.path:
@@ -18,9 +17,14 @@ try:
     from .drum_rig import BucketDrumRig
     from .telemetry import ExcavationTelemetry
 except ImportError:
-    from simulation.environment import CRMExcavationEnvironment, load_yaml_config
-    from simulation.drum_rig import BucketDrumRig
-    from simulation.telemetry import ExcavationTelemetry
+    try:
+        from simulation.environment import CRMExcavationEnvironment, load_yaml_config
+        from simulation.drum_rig import BucketDrumRig
+        from simulation.telemetry import ExcavationTelemetry
+    except ImportError:
+        from simulation.environment import CRMExcavationEnvironment, load_yaml_config
+        from simulation.drum_rig import BucketDrumRig
+        from simulation.telemetry import ExcavationTelemetry
 
 
 def run_sequential_simulation(
@@ -31,7 +35,7 @@ def run_sequential_simulation(
     save_particles: bool = True,
     verbose: bool = False,
 ):
-    """Executes a single isolated simulation run from the queue."""
+    """Executes a single isolated GPU-accelerated simulation run from the queue."""
     run_id = queue_item["run_id"]
     output_dir = os.path.join(output_root, run_id)
     os.makedirs(output_dir, exist_ok=True)
@@ -53,13 +57,13 @@ def run_sequential_simulation(
     print(f"  Kinematics: {op_cfg['rpm']} RPM, Vx={op_cfg['forward_velocity']} m/s")
     print(f"=======================================================")
 
-    # 1. Instantiate fresh physical SMC and CRM systems
+    # 1. Instantiate fresh physical SMC and CUDA CRM systems
     env = CRMExcavationEnvironment(crm_cfg, verbose=verbose)
 
-    # 2. Build PLA drum rig at specified trajectory starting coordinates and y_offset
+    # 2. Build PLA drum rig and sample surface BCE markers
     rig = BucketDrumRig(env, drum_cfg, op_cfg, y_offset=y_offset)
 
-    # 3. Fill container with untouched compacted BP-1 soil
+    # 3. Fill container with BP-1 soil and transfer buffers to CUDA GPU
     env.build_regolith_pit()
 
     # 4. Initialize telemetry
@@ -67,7 +71,7 @@ def run_sequential_simulation(
         env, rig, output_dir, save_particles=save_particles, prefix=drum_cfg["id"]
     )
 
-    # 5. Solver steps
+    # 5. GPU Time-Stepping Loop
     dt_mbd = float(crm_cfg["simulation"]["dt_mbd"])
     duration = float(crm_cfg["simulation"]["duration"])
     out_fps = float(crm_cfg["simulation"]["output_fps"])
@@ -78,6 +82,10 @@ def run_sequential_simulation(
 
     try:
         while sim_time < duration:
+            # Update native C++ motor speeds only when crossing phase boundaries
+            rig.update_motor_phase(sim_time)
+
+            # Advance CUDA SPH + MBS solver
             env.step(dt_mbd)
             sim_time += dt_mbd
 
@@ -85,10 +93,14 @@ def run_sequential_simulation(
                 frame_idx += 1
                 telemetry.record_frame(frame_idx, sim_time)
 
-                if frame_idx % int(out_fps) == 0:
+                # Print status every 10 frames (~0.16s of sim time) so you can watch progress live
+                if frame_idx % 10 == 0:
                     elapsed = time.time() - wall_start
+                    idx = int(rig.fsi_body_index) if isinstance(rig.fsi_body_index, int) else 0
+                    f_fsi = env.sysFSI.GetFsiBodyForce(idx)
                     print(
                         f"  [t = {sim_time:5.2f} / {duration:.2f} s] "
+                        f"Fx: {f_fsi.x:6.1f} N | Fz: {f_fsi.z:6.1f} N | "
                         f"Collected: {telemetry.prev_collected_mass_kg * 1000:6.1f} g | "
                         f"Spilled: {telemetry.cumulative_spilled_mass_kg * 1000:6.1f} g | "
                         f"Wall: {elapsed:6.1f} s"
@@ -134,7 +146,6 @@ def execute_queue(crm_yaml_path: str, sweep_yaml_path: str, verbose: bool = Fals
 
 
 if __name__ == "__main__":
-    # You can edit these defaults directly in PyCharm before clicking Run
     DEFAULT_CRM_CONFIG = "configs/bp1_earth_crm.yaml"
     DEFAULT_SWEEP_CONFIG = "configs/sweep_matrix.yaml"
     DEFAULT_VERBOSE = False

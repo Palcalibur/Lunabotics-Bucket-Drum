@@ -6,6 +6,8 @@ __pycache__/
 # C extensions
 *.so
 
+output/*
+
 # Re-enable all _*.pyd compiled modules anywhere in the repo
 !_* .pyd
 !**/_*.pyd
